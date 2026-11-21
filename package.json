@@ -1,0 +1,18 @@
+{
+  "name": "workshop",
+  "private": true,
+  "packageManager": "pnpm@12.21.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "demo": "node app/proof-drop/server.mjs"
+  },
+  "dependencies": {
+    "@solana-program/memo": "^0.16.0",
+    "@solana/kit": "^8.6.0",
+    "@solana/kit-plugin-litesvm": "^0.23.0",
+    "@solana/kit-plugin-signer": "^0.23.0",
+    "litesvm": "^1.6.2"
+  }
+}
