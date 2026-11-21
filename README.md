@@ -24,3 +24,11 @@ Click **Start round**, read the case clue, and inspect the two submissions befor
 Open **Inspect both fingerprints and the Solana receipt** to show the transaction signature and execution logs. Use **Try your own file** to stamp a real submission and check it later against the same receipt.
 
 After installing dependencies, the demo runs offline with an ephemeral signer and simulated SOL. Receipts live in memory and disappear on restart. The timestamp comes from the local server clock. A match shows byte-for-byte integrity against the recorded hash.
+
+## Verify the demo
+
+```sh
+npm test
+```
+
+Run this from the `solana-demo` folder after installing dependencies. The check uses the same stamp and verify functions as the web app. It executes a signed SPL Memo transaction in LiteSVM, reports compute units, and checks that the original file matches and a one-byte edit fails against the same receipt. It needs no listening port, browser, wallet, or network access.

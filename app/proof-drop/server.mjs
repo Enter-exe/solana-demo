@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { pathToFileURL } from 'node:url';
 
 import {
   createClient, generateKeyPairSigner, getSignatureFromTransaction, lamports, signature,
@@ -41,6 +42,28 @@ function receiptFor(txSignature) {
     }
   }
   return null;
+}
+
+export async function stampFingerprint(digest) {
+  const memo = getAddMemoInstruction({
+    memo: `proof-drop:v1:${digest}:${Date.now()}:${randomBytes(8).toString('hex')}`,
+  }, { programAddress: memoProgram });
+  const message = await client.planTransaction([memo]);
+  const transaction = await signTransactionMessageWithSigners(
+    client.svm.setTransactionMessageLifetimeUsingLatestBlockhash(message),
+  );
+  const simulation = client.svm.simulateTransaction(transaction);
+  if (simulation instanceof FailedTransactionMetadata) throw new Error(simulation.toString());
+  const result = client.svm.sendTransaction(transaction);
+  if (result instanceof FailedTransactionMetadata) throw new Error(result.toString());
+  const receipt = receiptFor(getSignatureFromTransaction(transaction));
+  if (!receipt) throw new Error('Memo execution could not be verified.');
+  return receipt;
+}
+
+export function verifyFingerprint(digest, txSignature) {
+  const receipt = receiptFor(txSignature);
+  return receipt ? { receipt, matches: receipt.digest === digest } : null;
 }
 
 const assets = new Map(await Promise.all([
@@ -103,31 +126,19 @@ const server = createServer(async (req, res) => {
 
   try {
     if (path === '/verify') {
-      const receipt = receiptFor(input.signature);
-      if (!receipt) return json(res, 404, { error: 'Receipt not found in this local session.' });
-      return json(res, 200, { receipt, matches: receipt.digest === input.digest });
+      const verification = verifyFingerprint(input.digest, input.signature);
+      if (!verification) return json(res, 404, { error: 'Receipt not found in this local session.' });
+      return json(res, 200, verification);
     }
-    const memo = getAddMemoInstruction({
-      memo: `proof-drop:v1:${input.digest}:${Date.now()}:${randomBytes(8).toString('hex')}`,
-    }, { programAddress: memoProgram });
-    const message = await client.planTransaction([memo]);
-    const transaction = await signTransactionMessageWithSigners(
-      client.svm.setTransactionMessageLifetimeUsingLatestBlockhash(message),
-    );
-    const simulation = client.svm.simulateTransaction(transaction);
-    if (simulation instanceof FailedTransactionMetadata) throw new Error(simulation.toString());
-    const result = client.svm.sendTransaction(transaction);
-    if (result instanceof FailedTransactionMetadata) throw new Error(result.toString());
-    const txSignature = getSignatureFromTransaction(transaction);
-    const receipt = receiptFor(txSignature);
-    if (!receipt) throw new Error('Memo execution could not be verified.');
-    return json(res, 201, { receipt });
+    return json(res, 201, { receipt: await stampFingerprint(input.digest) });
   } catch (error) {
     console.error(error);
     return json(res, 500, { error: 'Local Solana transaction failed. See the server console.' });
   }
 });
 
-server.listen(Number(process.env.PORT ?? 4173), '127.0.0.1', () => {
-  console.log(`Proof Drop is running at http://127.0.0.1:${server.address().port}`);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  server.listen(Number(process.env.PORT ?? 4173), '127.0.0.1', () => {
+    console.log(`Proof Drop is running at http://127.0.0.1:${server.address().port}`);
+  });
+}

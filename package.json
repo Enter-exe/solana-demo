@@ -6,7 +6,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "demo": "node app/proof-drop/server.mjs"
+    "demo": "node app/proof-drop/server.mjs",
+    "test": "node --test app/proof-drop/smoke.test.mjs"
   },
   "dependencies": {
     "@solana-program/memo": "^0.16.0",
